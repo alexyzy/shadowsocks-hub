@@ -1,7 +1,51 @@
-# Shadowsocks Hub
+# Shadowsocks Hub (v0.3.0)
 It is a web app for managing shadowsocks users, servers, nodes (a.k.a. exit points), products, accounts, and traffic. It is best suitable for companies, organizations, and groups of friends to manage their internal shadowsocks infrastructures. 
 
-## Install (Ubuntu 16.04)
+## Installation (Docker)
+
+1. Install Docker.
+2. Install Docker Compose.
+3. Download Shadowsocks Hub:
+    ```
+    cd ~
+    git clone https://github.com/shadowsocks/shadowsocks-hub.git
+    ```
+4. Create an environment file `.env`:
+    ```
+    cd ~/shadowsocks-hub
+    touch .env
+    ```
+5. Add the following configuration to `.env`:
+    ```
+    CODE_SECRET=changeThisSecret
+    MYSQL_PASSWORD=changeThisPassword
+    ```
+ 
+    Change the value of `CODE_SECRET` with a long and random string.  
+    Change the value of `MYSQL_PASSWORD` with another long and random string.
+
+6. Create a directory for digital certificate:
+    ```
+    cd ~/shadowsocks-hub
+    mkdir ssl
+    ```
+
+7. Set up digital certificate
+
+   Shadowsocks Hub uses https for all web traffic. It requires you to set up a digital certificate. You may obtain your digital certificate and key pair from any Certificate Authority (e.g. Let's Encrypt). Then rename the certificate file to `server.cert` and the key file to `server.key`. Finally, copy both `server.cert` and `server.key` to `~/shadowsocks-hub/ssl` directory.
+
+8. Create and start Docker container:
+    ```
+    cd ~/shadowsocks-hub
+    docker-compose up -d
+    ```
+
+    The first time will take a while (a few seconds ~ few minutes), in order to download docker images from Docker Hub and run them. So be patient. ;-)
+
+9. Shadowsocks Hub uses [shadowsocks-restful-api](https://github.com/shadowsocks/shadowsocks-restful-api) to manage shadowsocks node. Install it on every server acting as a shadowsocks node.
+
+## Non-Docker Installation (deprecated)
+This installation method has been deprecated and will be removed in the future. Please use the above mentioned docker installation method.
 
 1. Install Nodejs 8 or above.
 2. Install MySQL.
@@ -18,34 +62,27 @@ It is a web app for managing shadowsocks users, servers, nodes (a.k.a. exit poin
     ```
     CREATE DATABASE sshub;
     ```
-5. Create an environment file `.env`:
+5. Edit PM2 config file `~/shadowsocks-hub/ecosystem.config.js`, change the following configurations to your local settings :
     ```
-    cd ~/shadowsocks-hub
-    touch .env
-    ```
-6. Add the following configuration key-value pairs to `.env`:
-    ```
-    JWT_SECRET = 2wk0M@ow094B^&9k3==~o2soejd$sEEo@2(
-
-    DATABASE_HOST = localhost
-    DATABASE_PORT = 3306
-    DATABASE_USER = root
-    DATABASE_PASSWORD = d4f889df22769f54
-    ```
+    JWT_SECRET: '2wk0M@ow094B^&9k3==~o2soejd$sEEo@2(',
+    DATABASE_HOST: 'localhost',
+    DATABASE_PORT: '3306',
+    DATABASE_USER: 'root',
+    DATABASE_PASSWORD: 'd4f889df22769f54',
 
    Change the value of `JWT_SECRET` with a long and random string.  
    Change the values about the MySQL database connection to your local configurations.
 
-7. Initialize database:
+6. Initialize database:
     ```
     cd ~/shadowsocks-hub
     knex migrate:latest --env production
     ```
-8. Set up digital certificate
+7. Set up digital certificate
 
-   Shadowsocks Hub uses https for all web traffic. It requires you to set up a digital certificate. You may obtain your digital certificate and key pair from any Certificate Authority (e.g. Let's Encrypt). Then rename the certificate file as `server.cert` and the key file as `server.key`. Finally, copy both `server.cert` and `server.key` to `~/shadowsocks-hub`.   
+   Shadowsocks Hub uses https for all web traffic. It requires you to set up a digital certificate. You may obtain your digital certificate and key pair from any Certificate Authority (e.g. Let's Encrypt). Then rename the certificate file as `server.cert` and the key file as `server.key`. Finally, copy both `server.cert` and `server.key` to `~/shadowsocks-hub`.
 
-9. Give non-root user permission to use port 80, 443
+8. Give non-root user permission to use port 80, 443
 
    Shadowsocks Hub requires listenning to port 80 and 443. The following commands allow a non-root user to use both ports. This is the best practice from security point of view.
 
@@ -54,27 +91,36 @@ It is a web app for managing shadowsocks users, servers, nodes (a.k.a. exit poin
    sudo setcap cap_net_bind_service=+ep /usr/bin/node
    ```
 
+9. Shadowsocks Hub uses [shadowsocks-restful-api](https://github.com/shadowsocks/shadowsocks-restful-api) to manage shadowsocks node. Install it on every server acting as a shadowsocks node.
 
+## Update from non-Docker installation to Docker installation
+1. Make above mentioned docker version installation.
 
-10. Shadowsocks Hub uses [shadowsocks-restful-api](https://github.com/shadowsocks/shadowsocks-restful-api) to manage shadowsocks node. Install it on every server acting as a shadowsocks node.
-
-## Update
-When you have updated Shadowsocks Hub, run the following commands to update database tables:
-```
-cd ~/shadowsocks-hub
-knex migrate:latest --env production
-```
-
-## Run
-1. Run Shadowsocks Hub in background:
+2. Backup existing database:
     ```
     cd ~/shadowsocks-hub
-    pm2 start
+    mysqldump -u root -p sshub > backup.sql
+    ```
+
+3. Restore the backup to docker MySQL container:
+    ```
+    cd ~/shadowsocks-hub
+    docker-compose up -d
+    cat backup.sql | docker exec -i shadowsocks-hub_db_1 mysql -u root --password=MYSQL_PASSWORD sshub
+    ```
+
+    Note replace `MYSQL_PASSWORD` with your configration in `.env` file.
+
+## Run
+1. Run Shadowsocks Hub:
+    ```
+    cd ~/shadowsocks-hub
+    docker-compose up -d
     ```
 
 2. Visiting Shadowsocks Hub:
 
-    Visiting your Shadowsocks Hub website using your Shadowsocks Hub server domain name (recorded in the digital certificated) in any web browsers.   
+    Visiting your Shadowsocks Hub website using your server domain name in a web browser.   
 
 3. Change admin credential
 
@@ -84,19 +130,17 @@ knex migrate:latest --env production
 
 4. Run [shadowsocks-restful-api](https://github.com/shadowsocks/shadowsocks-restful-api) on every server acting as a shadowsocks node.
 
-5. Automatic restart
+## Stop
+```
+cd ~/shadowsocks-hub
+docker-compose stop
+```
 
-   If you'd like Shadowsocks Hub to automatically restart upon server reboot, run:
-
-    ```
-    pm2 save
-    ```
-
-   In case you want to stop automatic restart, run:
-   
-    ```
-    pm2 cleardump
-    ```
+## Restart
+```
+cd ~/shadowsocks-hub
+docker-compose restart
+```
 
 ## Usage
 ### Admin
